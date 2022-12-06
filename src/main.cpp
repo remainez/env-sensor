@@ -15,6 +15,7 @@ float getTemp();
 float getHum();
 void connectWifi();
 void connectAwsIot();
+char* getEnvValue();
 
 // 初期化
 float tmp = 0.0;
@@ -62,22 +63,7 @@ void setup() {
  * ループ処理
  */
 void loop() {
-  tmp = getTemp();
-  hum = getHum();
-  pressure = getPressure();
-
-  Serial.println("\nPublish start.");
-  DynamicJsonDocument doc(200);
-  char jsonString[100];
-
-  doc["気温"] = tmp;
-  doc["湿度"] = hum;
-  doc["気圧"] = pressure;
-
-  serializeJson(doc, jsonString);
-  mqttClient.publish(PUBLISH_TOPIC, jsonString);
-  Serial.println("\nPublish complate.");
-
+  mqttPublish("env-sensor/publish", getEnvValue());
   delay(5000);
 }
 
@@ -119,6 +105,30 @@ void connectAwsIot() {
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   // TODO: subscribe処理
+}
+
+/**
+ * MQTTでトピックにpublish
+ */
+void mqttPublish(char* topic, char* payload) {
+  Serial.println("\nPublish start.");
+  mqttClient.publish(topic, payload);
+  Serial.println("\nPublish complate.");
+}
+
+/**
+ * 環境値をjsonで返却
+ */
+char* getEnvValue() {
+  DynamicJsonDocument doc(200);
+
+  doc["tmp"] = getTemp();
+  doc["hum"] = getHum();
+  doc["prs"] = getPressure();
+
+  char jsonString[100];
+  serializeJson(doc, jsonString);
+  return jsonString;
 }
 
 /**
