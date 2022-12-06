@@ -15,6 +15,7 @@ float getTemp();
 float getHum();
 void connectWifi();
 void connectAwsIot();
+void reconnectAwsIot();
 void mqttPublish(const char* topic, char* payload);
 
 // 初期化
@@ -49,20 +50,28 @@ void setup() {
 
   M5.begin();
 
+  // 省電力設定
+  M5.Lcd.sleep();          // LCDコントローラーを停止
+  M5.Axp.SetDCDC3(false);  // バックライトをOFFに
+
   connectWifi();
   connectAwsIot();
 
   Wire.begin();    // I2C接続用ライブラリ初期化
   qmp6988.init();  // 気圧センサ初期化
 
-  M5.Lcd.setTextSize(3);
-  M5.Lcd.println("Start sending to AWS IoT Core.");
+  // M5.Lcd.setTextSize(3);
+  // M5.Lcd.println("Start sending to AWS IoT Core.");
 }
 
 /**
  * ループ処理
  */
 void loop() {
+  if (!mqttClient.connected()) {
+    Serial.println("\n!MQTT Client is disconnected!");
+    reconnectAwsIot();
+  }
   DynamicJsonDocument doc(100);
 
   doc["tmp"] = getTemp();
@@ -71,8 +80,9 @@ void loop() {
 
   char json[100];
   serializeJson(doc, json);
+  mqttClient.loop();
   mqttPublish(PUBLISH_TOPIC, json);
-  delay(5000);
+  delay(3600000);  // 1時間
 }
 
 /**
@@ -99,6 +109,23 @@ void connectAwsIot() {
   mqttClient.setServer(AWS_IOT_ENDPOINT, AWS_IOT_PORT);
   Serial.println("\nDone!");
 
+  // Connect to AWS IoT
+  while (!mqttClient.connected()) {
+    if (mqttClient.connect(DEVICE_NAME)) {
+      Serial.println("Connected.");
+    } else {
+      Serial.print("Failed. Error state=");
+      Serial.print(mqttClient.state());
+      delay(5000);
+    }
+  }
+}
+
+/**
+ * AWS IoT再接続接続
+ */
+void reconnectAwsIot() {
+  Serial.println("\nStart reconnect.");
   // Connect to AWS IoT
   while (!mqttClient.connected()) {
     if (mqttClient.connect(DEVICE_NAME)) {
