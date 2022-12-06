@@ -15,7 +15,7 @@ float getTemp();
 float getHum();
 void connectWifi();
 void connectAwsIot();
-char* getEnvValue();
+void mqttPublish(const char* topic, char* payload);
 
 // 初期化
 float tmp = 0.0;
@@ -25,12 +25,12 @@ float pressure = 0.0;
 // 定数
 const char* DEVICE_NAME = "env-sensor";
 const char* PUBLISH_TOPIC = "env-sensor/publish";
+const int AWS_IOT_PORT = 8883;
 
 // env.cpp
 extern const char* WIFI_SSID;
 extern const char* WIFI_PASS;
 extern const char* AWS_IOT_ENDPOINT;
-extern const int AWS_IOT_PORT;
 
 // certs.cpp
 extern const char* rootCa;
@@ -63,7 +63,15 @@ void setup() {
  * ループ処理
  */
 void loop() {
-  mqttPublish("env-sensor/publish", getEnvValue());
+  DynamicJsonDocument doc(100);
+
+  doc["tmp"] = getTemp();
+  doc["hum"] = getHum();
+  doc["prs"] = getPressure();
+
+  char json[100];
+  serializeJson(doc, json);
+  mqttPublish(PUBLISH_TOPIC, json);
   delay(5000);
 }
 
@@ -110,25 +118,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 /**
  * MQTTでトピックにpublish
  */
-void mqttPublish(char* topic, char* payload) {
+void mqttPublish(const char* topic, char* payload) {
   Serial.println("\nPublish start.");
   mqttClient.publish(topic, payload);
   Serial.println("\nPublish complate.");
-}
-
-/**
- * 環境値をjsonで返却
- */
-char* getEnvValue() {
-  DynamicJsonDocument doc(200);
-
-  doc["tmp"] = getTemp();
-  doc["hum"] = getHum();
-  doc["prs"] = getPressure();
-
-  char jsonString[100];
-  serializeJson(doc, jsonString);
-  return jsonString;
 }
 
 /**
